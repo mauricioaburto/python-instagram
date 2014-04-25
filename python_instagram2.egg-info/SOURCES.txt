@@ -1,0 +1,15 @@
+setup.py
+instagram2/__init__.py
+instagram2/bind.py
+instagram2/client.py
+instagram2/helper.py
+instagram2/json_import.py
+instagram2/models.py
+instagram2/oauth2.py
+instagram2/subscriptions.py
+python_instagram2.egg-info/PKG-INFO
+python_instagram2.egg-info/SOURCES.txt
+python_instagram2.egg-info/dependency_links.txt
+python_instagram2.egg-info/requires.txt
+python_instagram2.egg-info/top_level.txt
+python_instagram2.egg-info/zip-safe
