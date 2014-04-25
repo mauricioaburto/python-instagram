@@ -7,9 +7,13 @@ class ApiModel(object):
     def object_from_dictionary(cls, entry):
         # make dict keys all strings
         entry_str_dict = dict([(str(key), value) for key, value in entry.items()])
-        return cls(**entry_str_dict)
+        #return cls(**entry_str_dict)
+        model = cls(**entry_str_dict)
+        model._dict = entry_str_dict
+        return model
 
     def __repr__(self):
+        #return '<%s: %r>' % (str(self.__class__).split('.')[-1],dict([(k, v) for k, v in vars(self).items() if not k.startswith('_')]))
         return unicode(self).encode('utf8')
 
 
@@ -23,12 +27,10 @@ class Image(ApiModel):
     def __unicode__(self):
         return "Image: %s" % self.url
 
-
 class Video(Image):
 
     def __unicode__(self):
         return "Video: %s" % self.url
-
 
 class Media(ApiModel):
 
@@ -38,9 +40,9 @@ class Media(ApiModel):
             setattr(self, key, value)
 
     def get_standard_resolution_url(self):
-        if self.type == 'image':
+         if self.type == 'image':
             return self.images['standard_resolution'].url
-        else:
+         else:
             return self.videos['standard_resolution'].url
 
     def get_low_resolution_url(self):
@@ -49,25 +51,25 @@ class Media(ApiModel):
         else:
             return self.videos['low_resolution'].url
 
-
     def get_thumbnail_url(self):
         return self.images['thumbnail'].url
-
-
+           
     def __unicode__(self):
         return "Media: %s" % self.id
 
     @classmethod
     def object_from_dictionary(cls, entry):
         new_media = Media(id=entry['id'])
-        new_media.type = entry['type']
+        new_media._dict = entry    
+        new_media.type = entry.get('type')
 
         new_media.user = User.object_from_dictionary(entry['user'])
-
+        
         new_media.images = {}
         for version, version_info in entry['images'].iteritems():
-            new_media.images[version] = Image.object_from_dictionary(version_info)
+                new_media.images[version] = Image.object_from_dictionary(version_info)
 
+        
         if new_media.type == 'video':
             new_media.videos = {}
             for version, version_info in entry['videos'].iteritems():
@@ -94,9 +96,10 @@ class Media(ApiModel):
         new_media.caption = None
         if entry['caption']:
             new_media.caption = Comment.object_from_dictionary(entry['caption'])
-
+        
+        new_media.tags = []
         if entry['tags']:
-            new_media.tags = []
+            #new_media.tags = []
             for tag in entry['tags']:
                 new_media.tags.append(Tag.object_from_dictionary({'name': tag}))
 
@@ -124,7 +127,11 @@ class Comment(ApiModel):
 
     @classmethod
     def object_from_dictionary(cls, entry):
-        user = User.object_from_dictionary(entry['from'])
+        #user = User.object_from_dictionary(entry['from'])
+        user = None
+        if entry['from']:
+            user = User.object_from_dictionary(entry['from'])
+            user._dict = entry
         text = entry['text']
         created_at = timestamp_to_datetime(entry['created_time'])
         id = entry['id']
@@ -155,9 +162,10 @@ class Location(ApiModel):
         if 'latitude' in entry:
             point = Point(entry.get('latitude'),
                           entry.get('longitude'))
-        location = Location(entry.get('id', 0),
+        location = cls(entry.get('id'),
                        point=point,
-                       name=entry.get('name', ''))
+                       name=entry.get('name'))
+        location._dict = entry
         return location
 
     def __unicode__(self):
