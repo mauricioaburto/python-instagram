@@ -47,9 +47,12 @@ def bind_method(**config):
         def __init__(self, api, *args, **kwargs):
             self.api = api
             self.as_generator = kwargs.pop("as_generator", False)
-            self.return_json = kwargs.pop("return_json", False)
+            if self.as_generator:
+	    	self.pagination_format = 'next_url'
+	    else:
+                self.pagination_format = kwargs.pop('paginations_format', 'next_url')        
+	    self.return_json = kwargs.pop("return_json", False)
             self.max_pages = kwargs.pop("max_pages", 3)
-            self.with_next_url = kwargs.pop("with_next_url", None)
             self.parameters = {}
             self._build_parameters(args, kwargs)
             self._build_path()
@@ -88,6 +91,16 @@ def bind_method(**config):
                 self.path = self.path.replace(variable, value)
             self.path = self.path + '.%s' % self.api.format
 
+
+	def _build_pagination_info(self, content_obj):
+	    """pagination"""
+            pagination = content_obj.get('pagination',{})
+            if self.pagination_format == 'next_url':
+                return pagination.get('next_url')
+            if self.pagination_format == 'dict':
+                return pagination
+            raise Exception('Invalid value for pagination %s' % self.pagination_format)
+
         def _do_api_request(self, url, method="GET", body=None, headers=None):
             headers = headers or {}
             response, content = OAuth2Request(self.api).make_request(url, method=method, body=body, headers=headers)
@@ -99,20 +112,18 @@ def bind_method(**config):
             except ValueError:
                 raise InstagramClientError('Unable to parse response, not valid JSON.')
 
-            # Handle OAuthRateLimitExceeded from Instagram's Nginx which uses different format to documented api responses
+            #Handle OAuthLimitExceeded 
             if not content_obj.has_key('meta'):
-                if content_obj.get('code') == 420:
-                    error_message = content_obj.get('error_message') or "Your client is making too many request per second"
+                if content_obj-get('code') == 420:
+                    error_message = content_obj.get('error_message') or "Your client is making too many request"
                     raise InstagramAPIError(420, "Rate limited", error_message)
                 raise InstagramAPIError(content_obj.has_key('code'), content_obj.has_key('error_type'), content_obj.has_key('error_message'))
-
-            api_responses = []
+             
+	    api_responses = []
             status_code = content_obj['meta']['code']
-            self.api.x_ratelimit_remaining = response.get("x-ratelimit-remaining",None)
-            self.api.x_ratelimit = response.get("x-ratelimit-limit",None)
             if status_code == 200:
                 if not self.objectify_response:
-                    return content_obj, None
+                    return content_obj, content_obj.get('pagination',{}).get('next_url')
 
                 if self.response_type == 'list':
                     for entry in content_obj['data']:
@@ -129,31 +140,29 @@ def bind_method(**config):
                         api_responses = self.root_class.object_from_dictionary(data)
                 elif self.response_type == 'empty':
                     pass
-                return api_responses, content_obj.get('pagination', {}).get('next_url')
+                return api_responses, self._build_pagination_info(content_obj)
             else:
                 raise InstagramAPIError(status_code, content_obj['meta']['error_type'], content_obj['meta']['error_message'])
 
         def _paginator_with_url(self, url, method="GET", body=None, headers=None):
             headers = headers or {}
             pages_read = 0
-            while url and pages_read < self.max_pages:
+            while url:
+                if self.max_pages:
+                   if pages_read >= self.max_pages:
+                      break
                 api_responses, url = self._do_api_request(url, method, body, headers)
                 pages_read += 1
                 yield api_responses, url
             return
 
-        def _get_with_next_url(self, url, method="GET", body=None, headers=None):
-            headers = headers or {}
-            content, next = self._do_api_request(url, method, body, headers)
-            return content, next
-
         def execute(self):
+            if not self.parameters:
+               self.parameters = {}
             url, method, body, headers = OAuth2Request(self.api).prepare_request(self.method,
                                                                                  self.path,
                                                                                  self.parameters,
                                                                                  include_secret=self.include_secret)
-            if self.with_next_url:
-                return self._get_with_next_url(self.with_next_url, method, body, headers)
             if self.as_generator:
                 return self._paginator_with_url(url, method, body, headers)
             else:
