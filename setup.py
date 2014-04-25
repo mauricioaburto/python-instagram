@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 from setuptools import setup, find_packages
 
-setup(name="python-instagram",
-      version="1.0.0",
+setup(name="python-instagram2",
+      version="1.0.1",
       description="Instagram API client",
       license="MIT",
       install_requires=["simplejson","httplib2"],
